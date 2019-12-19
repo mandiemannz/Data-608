@@ -1,0 +1,137 @@
+---
+title: "CUNY DATA 608"
+author: "Amanda Arce"
+date: "12/15/2019"
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+---
+
+#Question
+
+NYC is one of the largest and busiest cities in the world.  Accidents in NYC are a common occurance - according to the NYPD, there are about  678 car accidents a day!  This research study will investigate accidents in New York City - SI.  The focus will be on what are the leading causes of accidents, what type of vehicles are involved in an accident, and where are the "hot spots" - or major areas prone to an accident. 
+
+
+
+#Libraries 
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(tidyverse)
+library(plotly)
+library(readr)
+library(knitr)
+library(leaflet)
+library(tigris)
+library(httr)
+library(leaflet.extras)
+```
+
+
+#Data
+
+The data is taken from NYC Open data - NYPD Motor Vehicle Collisions.  
+
+```{r message=FALSE, warning=FALSE, paged.print=TRUE}
+df <- read_csv("https://raw.githubusercontent.com/mandiemannz/Data-608/master/NYPD_Motor_Vehicle_Collisions%202017.csv")
+```
+
+```{r}
+kable(head(df))
+```
+
+#Contributing Factors
+
+The first step to take a closer look at what factors contributed towards a driver getting into an accident is to filter by the number of observations.  The dataset has a lot of low count occurances; so the data is filtered by a count of greater than 50.
+```{r}
+df1 <- df %>%
+  group_by(df$`CONTRIBUTING FACTOR VEHICLE 1`) %>%
+  filter(n()>50)
+```
+
+
+The data is then transformed into a gg plotly graph.
+```{r}
+p <- ggplot(df1,
+             aes(df1$`CONTRIBUTING FACTOR VEHICLE 1`)) +
+  geom_bar(aes(fill=df1$`VEHICLE TYPE CODE 1`)) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  xlab("Contributing Factor")
+
+p <- ggplotly(p)
+p
+```
+
+Looking at the graph, Driver Inattention/Distraction has the highest count of occurances within this dataset, followed by failure to yield right-of-way and following too closely.  Unspecified, while it has a high # of occurances, doesn't indicate what the actual contributiong factor was.  One might assume that distracted drivers are busy on their cell phones.
+
+
+
+The next investgation is of the types of vehicles themselves.  For this analysis, the data is filtered by a count of greater than 10.  For this varible, there was also a lot of single occurances in the data for types of vehicles. 
+
+```{r}
+vehicle <- df %>% group_by(df$`VEHICLE TYPE CODE 1`) %>% filter( n() > 10 )
+```
+
+```{r}
+vehicles <- ggplot(vehicle, aes(vehicle$`VEHICLE TYPE CODE 1`)) +
+  geom_bar(aes(fill=vehicle$`VEHICLE TYPE CODE 1`))+
+  theme(legend.position = "none") +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) +
+  xlab("Vehicle Type") +
+  ggtitle("Count of Vehicle Types per Accidents")
+
+
+vehicles<- ggplotly(vehicles)
+vehicles
+```
+
+Looking at the graphs above, the data shows that the type of vehicle with the most accidents is a passenger vehicle, followed by an SUV - which makes sense - most vehicles found are of that category. 
+
+
+#Location of Accidents
+
+The next investigation was of where exactly was the most accidents - prehaps there are locations that can be investigated by the local authorities.
+```{r}
+streetname <- df %>%
+  group_by(df$`ON STREET NAME`) %>%
+  filter(n()>50)
+
+streetnames <- ggplot(streetname, aes(streetname$`ON STREET NAME`)) +
+  geom_bar(aes(fill = streetname$`VEHICLE TYPE CODE 1`)) +
+  theme(legend.position = "none") +
+  theme(axis.text.x=element_text(angle=40, hjust=1)) +
+  xlab("Street Name") +
+  ggtitle("Count of Vehicle Types vs. Street")
+streetnames<- ggplotly(streetnames)
+streetnames
+```
+
+According to the data, it seems that a lot of the location data is missing - null.  Following the null data, we can see that Hylan Boulevard and Richmond road have the higest occurance of accidents recorded. 
+
+#Leaflet Map
+The next step in the analysis is to plot the datapoints on a map - this allows us to better see areas of accidents.  The data is filtered to include only SI - however, it seems that some lat/longs point to other areas in NYC.
+```{r}
+df2 <- subset(df, select=c("LONGITUDE", "LATITUDE", "CONTRIBUTING FACTOR VEHICLE 1"))
+df2 <- na.omit(df2)
+```
+
+```{r}
+leaflet() %>%
+  addTiles() %>% 
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(-74.15, 40.57, zoom = 11) %>%
+  addHeatmap(
+    lng = df2$LONGITUDE, lat = df2$LATITUDE,blur = 20, max = 0.05, radius = 15
+  )
+```
+
+
+The heatmap shows what our other data indicated - the most accidents seem to happy on Southern Hyland Blvd.
+
+# Conclusion
+
+The data shows that the most accidents occur due to driver inattention.  One could assume that inattention is related to cell-phone usage.  The data also shows that the most accidents appear to happen in a sedan or SUV, and are located within busy major streets.
+
